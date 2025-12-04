@@ -1,0 +1,62 @@
+name: Build DLL
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Build with MSBuild
+      run: |
+        # 创建简单的DLL项目文件
+        $solution = @'
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{$(guid)}</ProjectGuid>
+    <RootNamespace>TDX_Indicator</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ItemGroup>
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\TCalcFuncSets.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\PluginTCalcFunc.h" />
+    <ClInclude Include="src\TCalcFuncSets.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>
+'@
+        
+        # 生成GUID
+        $guid = [guid]::NewGuid().ToString("B").ToUpper()
+        $solution = $solution.Replace('$(guid)', $guid)
+        
+        # 保存项目文件
+        $solution | Out-File -FilePath "TDX_Indicator.vcxproj" -Encoding UTF8
+        
+        # 使用MSBuild编译
+        msbuild TDX_Indicator.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=.\output\
+        
+    - name: Upload DLL
+      uses: actions/upload-artifact@v4
+      with:
+        name: TDX_Indicator
+        path: output/*.dll
